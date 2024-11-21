@@ -1,0 +1,11 @@
+# https://rust-lang.github.io/rustfmt/
+edition = "2021"
+max_width = 140
+
+# Following settings only with rust nightly (as of 27.11.2023)
+unstable_features   = true
+brace_style         = "AlwaysNextLine"
+control_brace_style = "AlwaysNextLine"
+struct_field_align_threshold = 20
+enum_discrim_align_threshold = 20
+
