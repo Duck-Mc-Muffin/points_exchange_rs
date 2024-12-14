@@ -1,84 +1,105 @@
-use clap::ValueEnum;
-use cli_consumer::CliConsumer;
+use crate::core::*;
+use clap::{Parser, Subcommand};
 
 pub mod cli_consumer;
 
-pub type UserID = u32;
-pub type TokenID = u32;
-pub type TokenAmount = i32;
-
-/// Order output in ascending (asc) or descending (desc) order
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum Order
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+pub struct Args
 {
-    Asc,
-    Desc,
+    #[command(subcommand)]
+    pub command: Action,
 }
 
-// Various ordering "by column" options (depending on the query)
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum OrderBySenderOrAmount
+#[derive(Subcommand)]
+pub enum Action
 {
-    Sender,
-    Amount,
-}
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum OrderByTokenOrSenderOrAmount
-{
-    Token,
-    Sender,
-    Amount,
-}
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-pub enum OrderByReceiverOrSenderOrAmount
-{
-    Receiver,
-    Sender,
-    Amount,
-}
-
-#[derive(Debug)]
-pub struct CliDummy;
-
-impl CliConsumer for CliDummy
-{
-    fn query_user(&self, name: Option<&str>)
+    /// Register a new user
+    CreateUser
     {
-        println!("UserList: {name:?}");
-    }
-
-    fn query_token(&self, name: Option<&str>)
+        /// Displayed name of this new user
+        name: String,
+    },
+    /// Get user information by user name (or all users)
+    UserList
     {
-        println!("TokenList: {name:?}");
-    }
+        /// User name to search for
+        name: Option<String>,
+    },
 
-    fn transaction(&self, sender_id: UserID, receiver_id: UserID, token_id: TokenID, amount: TokenAmount)
+    /// Register a new token explicitly
+    CreateToken
     {
-        println!("Tr: {sender_id}, {receiver_id}, {token_id}, {amount}");
-    }
+        /// Displayed name of this new token
+        name: String,
+    },
+    /// Get token information by token name (or all tokens)
+    TokenList
+    {
+        /// Token name to search for
+        name: Option<String>,
+    },
 
-    fn list_user_token(&self, user_id: UserID, token_id: TokenID, order: Order, order_by: Option<OrderBySenderOrAmount>)
+    /// Send tokens from User A to User B
+    #[command(name = "tr")]
+    Transaction
     {
-        println!("LsUserTokens: {user_id}, {token_id}, {order:?}, {order_by:?}");
-    }
+        /// Token "sender"
+        sender_id: UserID,
 
-    fn list_tokens_by_user(&self, user_id: UserID, order: Order, order_by: Option<OrderByTokenOrSenderOrAmount>)
-    {
-        println!("LsTokens: {user_id}, {order:?}, {order_by:?}");
-    }
+        /// Token "receiver"
+        receiver_id: UserID,
 
-    fn list_users_by_token(&self, token_id: UserID, order: Order, order_by: Option<OrderByReceiverOrSenderOrAmount>)
-    {
-        println!("LsUsers: {token_id}, {order:?}, {order_by:?}");
-    }
+        /// Token ID
+        token_id: TokenID,
 
-    fn create_user(&self, name: &str)
-    {
-        println!("CreateUser: {name}");
-    }
+        /// Amount
+        amount: TokenAmount,
+    },
 
-    fn create_token(&self, name: &str)
+    /// Show the amount of a _specific_ token a _specific_ user received from each other user
+    LsUserToken
     {
-        println!("CreateToken: {name}");
-    }
+        /// User
+        user_id: UserID,
+
+        /// Token
+        token_id: TokenID,
+
+        /// Order output in ascending (asc) or descending (desc) order
+        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
+        order: Order,
+
+        /// Which parameter should be used to order the output
+        #[arg(value_enum, long)]
+        order_by: Option<OrderBySenderOrAmount>,
+    },
+    /// Show the amount of _all_ tokens a _specific_ user received from each other user
+    LsTokensByUser
+    {
+        /// User
+        user_id: UserID,
+
+        /// Order output in ascending (asc) or descending (desc) order
+        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
+        order: Order,
+
+        /// Which parameter should be used to order the output
+        #[arg(value_enum, long)]
+        order_by: Option<OrderByTokenOrSenderOrAmount>,
+    },
+    /// Show the amount of a _specific_ token _all_ users received from each other user
+    LsUsersByToken
+    {
+        /// Token
+        token_id: TokenID,
+
+        /// Order output in ascending (asc) or descending (desc) order
+        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
+        order: Order,
+
+        /// Which parameter should be used to order the output
+        #[arg(value_enum, long = "order-by")]
+        order_by: Option<OrderByReceiverOrSenderOrAmount>,
+    },
 }

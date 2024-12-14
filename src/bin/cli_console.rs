@@ -27,14 +27,16 @@
  *      ...
  */
 
-use clap::{arg, Parser, Subcommand};
-use cli_consumer::CliConsumer;
+use clap::Parser;
+use points_exchange_rs::cli::cli_consumer::CliConsumer; // TODO: alias in module or something?
 use points_exchange_rs::cli::*;
+use points_exchange_rs::core;
+use points_exchange_rs::core::{TokenQueryModeStrict, TokenQueryModeWithCreation, UserQueryModeStrict, UserQueryModeWithCreation};
 
 fn main()
 {
-    let args = Args::parse();
-    let wrapper = CliDummy;
+    let args = Args::parse(); // TODO: encapsulate call to remove lib dependency
+    let wrapper = CliWrapper;
 
     match args.command
     {
@@ -59,104 +61,93 @@ fn main()
     }
 }
 
-/// Simple program to greet a person
-#[derive(Parser)]
-#[command(version, about, long_about = None)]
-struct Args
+struct CliWrapper;
+
+impl CliConsumer for CliWrapper
 {
-    #[command(subcommand)]
-    command: Action,
-}
-
-#[derive(Subcommand)]
-enum Action
-{
-    /// Register a new user
-    CreateUser
+    fn create_user(&self, name: &str)
     {
-        /// Displayed name of this new user
-        name: String,
-    },
-    /// Get user information by user name (or all users)
-    UserList
+        println!("{:?}", core::create_user(name));
+    }
+
+    fn query_user(&self, name: Option<&str>)
     {
-        /// User name to search for
-        name: Option<String>,
-    },
+        println!("{:?}", core::query_user(name));
+    }
 
-    /// Register a new token explicitly
-    CreateToken
+    fn create_token(&self, name: &str)
     {
-        /// Displayed name of this new token
-        name: String,
-    },
-    /// Get token information by token name (or all tokens)
-    TokenList
+        println!("{:?}", core::create_token(name));
+    }
+
+    fn query_token(&self, name: Option<&str>)
     {
-        /// Token name to search for
-        name: Option<String>,
-    },
+        println!("{:?}", core::query_token(name));
+    }
 
-    /// Send tokens from User A to User B
-    #[command(name = "tr")]
-    Transaction
+    fn transaction(
+        &self,
+        sender_id: points_exchange_rs::core::UserID,
+        receiver_id: points_exchange_rs::core::UserID,
+        token_id: points_exchange_rs::core::TokenID,
+        amount: points_exchange_rs::core::TokenAmount,
+    )
     {
-        /// Token "sender"
-        sender_id: UserID,
+        println!(
+            "{:?}",
+            core::transaction(
+                UserQueryModeWithCreation::ById(sender_id),
+                UserQueryModeWithCreation::ById(receiver_id),
+                TokenQueryModeWithCreation::ById(token_id),
+                amount
+            )
+            .unwrap()
+        );
+    }
 
-        /// Token "receiver"
-        receiver_id: UserID,
-
-        /// Token ID
-        token_id: TokenID,
-
-        /// Amount
-        amount: TokenAmount,
-    },
-
-    /// Show the amount of a _specific_ token a _specific_ user received from each other user
-    LsUserToken
+    fn list_user_token(
+        &self,
+        user_id: points_exchange_rs::core::UserID,
+        token_id: points_exchange_rs::core::TokenID,
+        order: points_exchange_rs::core::Order,
+        order_by: Option<points_exchange_rs::core::OrderBySenderOrAmount>,
+    )
     {
-        /// User
-        user_id: UserID,
+        println!(
+            "{:?}",
+            core::list_user_token(
+                UserQueryModeStrict::ById(user_id),
+                TokenQueryModeStrict::ById(token_id),
+                order,
+                order_by
+            )
+            .unwrap()
+        );
+    }
 
-        /// Token
-        token_id: TokenID,
-
-        /// Order output in ascending (asc) or descending (desc) order
-        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
-        order: Order,
-
-        /// Which parameter should be used to order the output
-        #[arg(value_enum, long)]
-        order_by: Option<OrderBySenderOrAmount>,
-    },
-    /// Show the amount of _all_ tokens a _specific_ user received from each other user
-    LsTokensByUser
+    fn list_tokens_by_user(
+        &self,
+        user_id: points_exchange_rs::core::UserID,
+        order: points_exchange_rs::core::Order,
+        order_by: Option<points_exchange_rs::core::OrderByTokenOrSenderOrAmount>,
+    )
     {
-        /// User
-        user_id: UserID,
+        println!(
+            "{:?}",
+            core::list_tokens_by_user(UserQueryModeStrict::ById(user_id), order, order_by).unwrap()
+        );
+    }
 
-        /// Order output in ascending (asc) or descending (desc) order
-        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
-        order: Order,
-
-        /// Which parameter should be used to order the output
-        #[arg(value_enum, long)]
-        order_by: Option<OrderByTokenOrSenderOrAmount>,
-    },
-    /// Show the amount of a _specific_ token _all_ users received from each other user
-    LsUsersByToken
+    fn list_users_by_token(
+        &self,
+        token_id: points_exchange_rs::core::UserID,
+        order: points_exchange_rs::core::Order,
+        order_by: Option<points_exchange_rs::core::OrderByReceiverOrSenderOrAmount>,
+    )
     {
-        /// Token
-        token_id: TokenID,
-
-        /// Order output in ascending (asc) or descending (desc) order
-        #[arg(value_enum, long, short = 'o', default_value_t=Order::Desc)]
-        order: Order,
-
-        /// Which parameter should be used to order the output
-        #[arg(value_enum, long = "order-by")]
-        order_by: Option<OrderByReceiverOrSenderOrAmount>,
-    },
+        println!(
+            "{:?}",
+            core::list_users_by_token(TokenQueryModeStrict::ById(token_id), order, order_by).unwrap()
+        );
+    }
 }
