@@ -2,6 +2,7 @@ use clap::ValueEnum;
 
 // mod token;
 // mod user;
+mod persistance_layer;
 
 pub type UserID = u32;
 pub type TokenID = u32;
@@ -128,7 +129,7 @@ pub fn transaction(
 {
     let _sender_id: UserID = match sender
     {
-        // TODO: pop-ing the >last< match is not optimal
+        // TODO: pop-ing the >last< match is not intuitive
         UserQueryModeWithCreation::ById(id) => id,
         UserQueryModeWithCreation::ByName(name) => query_user(Some(name)).pop().ok_or(())?.id,
         UserQueryModeWithCreation::ByNameOrCreate(name) => query_user(Some(name)).pop().unwrap_or_else(|| create_user(name)).id,
@@ -136,7 +137,7 @@ pub fn transaction(
 
     let _receiver_id: UserID = match receiver
     {
-        // TODO: pop-ing the >last< match is not optimal
+        // TODO: pop-ing the >last< match is not intuitive
         UserQueryModeWithCreation::ById(id) => id,
         UserQueryModeWithCreation::ByName(name) => query_user(Some(name)).pop().ok_or(())?.id,
         UserQueryModeWithCreation::ByNameOrCreate(name) => query_user(Some(name)).pop().unwrap_or_else(|| create_user(name)).id,
@@ -144,7 +145,7 @@ pub fn transaction(
 
     let _token_id: UserID = match token
     {
-        // TODO: pop-ing the >last< match is not optimal
+        // TODO: pop-ing the >last< match is not intuitive
         TokenQueryModeWithCreation::ById(id) => id,
         TokenQueryModeWithCreation::ByName(name) => query_token(Some(name)).pop().ok_or(())?.id,
         TokenQueryModeWithCreation::ByNameOrCreate(name) => query_token(Some(name)).pop().unwrap_or_else(|| create_token(name)).id,
