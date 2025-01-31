@@ -1,11 +1,13 @@
-use super::persistance_layer::PersistanceLayer;
-use super::*;
+use super::{
+    persistance_layer::*, Order, OrderByReceiverOrSenderOrAmount, OrderBySenderOrAmount, OrderByTokenOrSenderOrAmount, TokenAmount,
+    TokenQueryModeStrict, UserQueryModeStrict,
+};
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
 
 #[derive(Debug)]
 pub struct DataSQLite
 {
-    _connection_pool: Option<SqlitePool>,
+    connection_pool: SqlitePool,
 }
 
 const MAX_CONNECTIONS: u32 = 5;
@@ -21,88 +23,98 @@ impl DataSQLite
 
         let connection_pool = match pool
         {
-            Ok(pool) => Some(pool),
+            Ok(pool) => pool,
             Err(err) => panic!("SQLite error: {}", err),
         };
 
-        DataSQLite {
-            _connection_pool: connection_pool,
-        }
+        DataSQLite { connection_pool }
     }
 }
 
 impl PersistanceLayer for DataSQLite
 {
-    fn create_user(&mut self, _name: &str) -> UserListEntry
+    async fn create_user(&self, name: &str) -> Result<User, sqlx::Error>
     {
-        // INSERT INTO user(name) VALUES(:name)
-        // LAST ID
-        UserListEntry {
-            id:   233,
-            name: "Max Mustermann".to_string(),
-        }
+        sqlx::query_as!(User, "INSERT INTO User(name) VALUES (?) RETURNING *", name)
+            .fetch_one(&self.connection_pool)
+            .await
     }
 
-    fn query_user(&mut self, _name: Option<&str>) -> Vec<UserListEntry>
+    async fn get_all_users(&self) -> Result<Vec<User>, sqlx::Error>
     {
         // SELECT * FROM user
-        // SELECT * FROM user WHERE name LIKE '%:name%'
-        vec![UserListEntry {
+        Ok(vec![User {
             id:   974,
             name: "John Doe".to_string(),
-        }]
+        }])
     }
 
-    fn create_token(&mut self, _name: &str) -> TokenListEntry
+    async fn query_user(&self, _name: &str) -> Result<Vec<User>, sqlx::Error>
     {
-        // INSERT INTO token(name) VALUES(:name)
-        // LAST ID
-        TokenListEntry {
-            id:   890,
-            name: "my-other-token".to_string(),
-        }
+        // SELECT * FROM user WHERE name LIKE '%:name%'
+        Ok(vec![User {
+            id:   974,
+            name: "John Doe".to_string(),
+        }])
     }
 
-    fn query_token(&mut self, _name: Option<&str>) -> Vec<TokenListEntry>
+    async fn create_token(&self, name: &str) -> Result<Token, sqlx::Error>
+    {
+        sqlx::query_as!(Token, "INSERT INTO Token(name) VALUES (?) RETURNING *", name)
+            .fetch_one(&self.connection_pool)
+            .await
+    }
+
+    async fn get_all_tokens(&self) -> Result<Vec<Token>, sqlx::Error>
     {
         // SELECT * FROM token
-        // SELECT * FROM token WHERE name LIKE '%:name%'
-        vec![TokenListEntry {
+        Ok(vec![Token {
             id:   863,
             name: "my-token".to_string(),
-        }]
+        }])
     }
 
-    fn get_current_total(
-        &mut self,
-        _sender: UserQueryModeStrict,
-        _receiver: UserQueryModeStrict,
-        _token: TokenQueryModeStrict,
-    ) -> Option<TokenAmount>
+    async fn query_token(&self, _name: &str) -> Result<Vec<Token>, sqlx::Error>
+    {
+        // SELECT * FROM token WHERE name LIKE '%:name%'
+        Ok(vec![Token {
+            id:   863,
+            name: "my-token".to_string(),
+        }])
+    }
+
+    /// A return value of _None_ means, there are no transactions present.
+    /// _Some(0)_ means, all found transactions sum up to zero.
+    async fn get_current_total(
+        &self,
+        _sender: UserQueryModeStrict<'_>,
+        _receiver: UserQueryModeStrict<'_>,
+        _token: TokenQueryModeStrict<'_>,
+    ) -> Result<Option<TokenAmount>, sqlx::Error>
     {
         // SELECT current_total FROM user_balance WHERE sender_id = :sender_id, receiver_id = :receiver_id, token_id = :token_id
-        Some(1337)
+        Ok(Some(1337))
     }
 
-    fn transaction(
-        &mut self,
-        _sender: UserQueryModeStrict,
-        _receiver: UserQueryModeStrict,
-        _token: TokenQueryModeStrict,
+    async fn transaction(
+        &self,
+        _sender: UserQueryModeStrict<'_>,
+        _receiver: UserQueryModeStrict<'_>,
+        _token: TokenQueryModeStrict<'_>,
         _amount: TokenAmount,
-    ) -> Result<TokenAmount, ()>
+    ) -> Result<TokenAmount, sqlx::Error>
     {
         // INSERT INTO transaction_history(sender_id, receiver_id, token_id, amount) VALUES(:sender_id, :receiver_id, :token_id, :amount)
         Ok(420)
     }
 
-    fn list_user_token(
-        &mut self,
-        _receiver: UserQueryModeStrict,
-        _token: TokenQueryModeStrict,
+    async fn list_user_token(
+        &self,
+        _receiver: UserQueryModeStrict<'_>,
+        _token: TokenQueryModeStrict<'_>,
         _order: Order,
         _order_by: Option<OrderBySenderOrAmount>,
-    ) -> Result<Vec<RelativeUserTokenAmountEntry>, ()>
+    ) -> Result<Vec<RelativeUserTokenAmountEntry>, sqlx::Error>
     {
         // SELECT sender.*, balance.mount
         // FROM user_balance AS balance
@@ -110,7 +122,7 @@ impl PersistanceLayer for DataSQLite
         // WHERE receiver_id = :receiver_id, token_id = :token_id
         // ORDER BY :order_by :order
         Ok(vec![RelativeUserTokenAmountEntry {
-            sender: UserListEntry {
+            sender: User {
                 id:   1,
                 name: "Jane Doe".to_string(),
             },
@@ -118,12 +130,12 @@ impl PersistanceLayer for DataSQLite
         }])
     }
 
-    fn list_tokens_by_user(
-        &mut self,
-        _receiver: UserQueryModeStrict,
+    async fn list_tokens_by_user(
+        &self,
+        _receiver: UserQueryModeStrict<'_>,
         _order: Order,
         _order_by: Option<OrderByTokenOrSenderOrAmount>,
-    ) -> Result<Vec<RelativeTokenAmountEntry>, ()>
+    ) -> Result<Vec<RelativeTokenAmountEntry>, sqlx::Error>
     {
         // SELECT sender.*, token.*, balance.amount
         // FROM user_balance AS balance
@@ -131,12 +143,12 @@ impl PersistanceLayer for DataSQLite
         // WHERE receiver_id = :receiver_id
         // ORDER BY :order_by :order
         Ok(vec![RelativeTokenAmountEntry {
-            token:            TokenListEntry {
+            token:            Token {
                 id:   2,
                 name: "yet-another-token".to_string(),
             },
             amount_by_sender: vec![RelativeUserTokenAmountEntry {
-                sender: UserListEntry {
+                sender: User {
                     id:   1,
                     name: "Jane Doe".to_string(),
                 },
@@ -145,12 +157,12 @@ impl PersistanceLayer for DataSQLite
         }])
     }
 
-    fn list_users_by_token(
-        &mut self,
-        _token: TokenQueryModeStrict,
+    async fn list_users_by_token(
+        &self,
+        _token: TokenQueryModeStrict<'_>,
         _order: Order,
         _order_by: Option<OrderByReceiverOrSenderOrAmount>,
-    ) -> Result<Vec<RelativeUserAmountEntry>, ()>
+    ) -> Result<Vec<RelativeUserAmountEntry>, sqlx::Error>
     {
         // SELECT sender.*, receiver.*, balance.amount
         // FROM user_balance AS balance
@@ -159,12 +171,12 @@ impl PersistanceLayer for DataSQLite
         // WHERE balance.token_id = :token_id
         // ORDER BY :order_by :order
         Ok(vec![RelativeUserAmountEntry {
-            receiver:         UserListEntry {
+            receiver:         User {
                 id:   5,
                 name: "John doe".to_string(),
             },
             amount_by_sender: vec![RelativeUserTokenAmountEntry {
-                sender: UserListEntry {
+                sender: User {
                     id:   1,
                     name: "Max Mustermann".to_string(),
                 },
